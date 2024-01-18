@@ -7,7 +7,6 @@ contract Escrow is ReentrancyGuard {
     address public escAcc;
     uint256 public escAvailBal;
     uint256 public escFee;
-    uint256 public escBal;
     uint256 public totalItems;
     uint256 public totalConfirmed;
     uint256 public totalDisputed;
@@ -72,7 +71,6 @@ contract Escrow is ReentrancyGuard {
         itemsOf[msg.sender].push(item);
         ownerOf[itemId] = msg.sender;
         isAvailable[itemId] = Available.YES;
-        escBal += msg.value;
 
         emit Action(itemId, "ITEM CREATED", Status.OPEN, msg.sender);
 
@@ -96,7 +94,7 @@ contract Escrow is ReentrancyGuard {
     }
 
     function requestItem(uint256 _itemId) public returns (bool) {
-        require(msg.sender != ownerOf[_itemId], "Owner is not required");
+        require(msg.sender != ownerOf[_itemId], "Owner cant request own item");
         require(isAvailable[_itemId] == Available.YES, "Item is not available");
         requested[msg.sender][_itemId] = true;
 
@@ -151,13 +149,15 @@ contract Escrow is ReentrancyGuard {
     ) public returns (bool) {
         require(msg.sender == ownerOf[_itemId], "Only Owner allowed");
         require(items[_itemId].provided, "You have not delivered this item");
-        require(items[_itemId].status != Status.REFUNDED, "Already refunded");
+        require(
+            items[_itemId].status != Status.REFUNDED,
+            "Item is disputed and Already refunded"
+        );
 
         if (_provided) {
             uint256 fee = (items[_itemId].amount * escFee) / 100;
             uint256 amount = items[_itemId].amount - fee;
             payTo(items[_itemId].buyer, amount);
-            escBal -= amount;
             escAvailBal += fee;
 
             items[_itemId].status = Status.CONFIRMED;
@@ -184,7 +184,6 @@ contract Escrow is ReentrancyGuard {
         require(items[_itemId].provided, "You have not delivered this item");
 
         payTo(items[_itemId].owner, items[_itemId].amount);
-        escBal -= items[_itemId].amount;
         items[_itemId].status = Status.REFUNDED;
         totalDisputed++;
 
